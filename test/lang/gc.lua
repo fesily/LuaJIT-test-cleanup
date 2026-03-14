@@ -1,3 +1,7 @@
+local jit = require"jit"
+
+jit.off()
+
 do --- rechain
   local k
 
