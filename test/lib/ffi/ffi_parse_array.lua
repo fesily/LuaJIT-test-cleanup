@@ -28,6 +28,9 @@ assert(ffi.sizeof("foo1_t") == 40)
 assert(ffi.sizeof("foo2_t") == 200)
 
 local P = ffi.sizeof("void *")
+local hex_char_decl = ffi.abi("compat_lex_unicode")
+                     and "char ['O']"
+                      or "char ['\\x4F']"
 
 checktypes{
   10,	1,	"char [10]",
@@ -47,7 +50,7 @@ checktypes{
   4*10,	8,	"int [10] __attribute__((aligned(8)))",
   97,	1,	"char ['a']",
   83,	1,	"char ['\\123']",
-  79,	1,	"char ['\x4F']",
+  79,	1,	hex_char_decl,
   5,	1,	"char [sizeof(\"aa\" \"bb\")]",
   80,	8,	"double [10]",
 }
