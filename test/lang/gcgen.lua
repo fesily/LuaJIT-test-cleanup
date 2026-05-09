@@ -165,3 +165,39 @@ do --- mixed_gc_modes_with_finalizers
   assert(count > 0)
   collectgarbage("incremental")
 end
+
+do --- weak_table_touched_barrier
+  -- Regression: correctgraylist asserted TOUCHED1 objects must be gray, but
+  -- weak tables can be BLACK+TOUCHED1 after atomic propagation.
+  local oldmode = collectgarbage("generational")
+  for round = 1, 10 do
+    local t = setmetatable({}, {__mode = "kv"})
+    for i = 1, 20 do
+      local ud = newproxy(true)
+      getmetatable(ud).__gc = function() end
+      t[ud] = i
+    end
+    collectgarbage("step")
+  end
+  collectgarbage(oldmode)
+end
+
+do --- trace_proto_survives_minor
+  -- Regression: OLD traces must keep their proto alive during minor
+  -- collections. Without gc_marktraceprotos, the proto is swept while
+  -- the trace survives, corrupting T->startpt.
+  jit.on()
+  local oldmode = collectgarbage("generational")
+  jit.opt.start("hotloop=1")
+  for j = 1, 50 do
+    loadstring("for i=1,100 do end")()
+  end
+  for k = 1, 20 do
+    local garbage = {}
+    for i = 1, 500 do garbage[i] = {k, i} end
+    collectgarbage("step")
+  end
+  collectgarbage()
+  collectgarbage(oldmode)
+  jit.off()
+end
