@@ -14,6 +14,7 @@ coroutine.lua
 tail_recursion.lua
 vararg_jit.lua
 gc.lua
+gcgen.lua
 gcinc.lua
 goto.lua +goto
 meta
