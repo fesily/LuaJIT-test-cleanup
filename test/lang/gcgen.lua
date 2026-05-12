@@ -201,3 +201,28 @@ do --- trace_proto_survives_minor
   collectgarbage(oldmode)
   jit.off()
 end
+
+do --- minor2inc_clears_gray_lists
+  -- Regression: minor2inc must clear gray/grayagain/weak before entering
+  -- sweep phase. Otherwise, traces on grayagain (from lj_gc_barriertrace)
+  -- survive sweep while their referenced objects are freed, causing a crash
+  -- in gc_traverse_trace during the next incremental mark phase.
+  jit.on()
+  local oldmode = collectgarbage("generational")
+  jit.opt.start("hotloop=1")
+  local function hotfunc(n)
+    local s = 0
+    for i = 1, n do s = s + i end
+    return s
+  end
+  for i = 1, 20 do hotfunc(100) end
+  for i = 1, 100 do
+    local garbage = {}
+    for j = 1, 500 do garbage[j] = {i, j} end
+    collectgarbage("step")
+  end
+  collectgarbage()
+  collectgarbage()
+  collectgarbage(oldmode)
+  jit.off()
+end
