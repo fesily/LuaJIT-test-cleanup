@@ -226,3 +226,67 @@ do --- minor2inc_clears_gray_lists
   collectgarbage(oldmode)
   jit.off()
 end
+
+do --- major_survives_full_cycle
+  -- Basic test: trigger minor→major→gen transition and verify data survives.
+  local oldmode = collectgarbage("generational", 20, 10)
+  local data = {}
+  for i = 1, 50 do data[i] = { id = i, val = ("M"):rep(32) } end
+  for i = 1, 10 do collectgarbage("step") end
+  for i = 1, 100 do
+    local _ = {}
+    for j = 1, 300 do _[j] = { ("x"):rep(128) } end
+    collectgarbage("step")
+  end
+  for i = 1, 200 do collectgarbage("step") end
+  collectgarbage()
+  for i = 1, 50 do
+    assert(data[i].id == i, "major cycle corrupted data["..i.."]")
+  end
+  collectgarbage(oldmode)
+end
+
+do --- major_finalizer_writes_old_table
+  -- Regression: __gc writing to old table during major incremental sweep
+  -- must not trigger assertion or corrupt grayagain list.
+  local oldmode = collectgarbage("generational", 20, 10)
+  local anchor = {}
+  for i = 1, 20 do anchor[i] = { id = i } end
+  for i = 1, 10 do collectgarbage("step") end
+  for w = 1, 3 do
+    for i = 1, 15 do
+      local u = newproxy(true)
+      getmetatable(u).__gc = function()
+        anchor[((i - 1) % 20) + 1].gc = w
+      end
+    end
+    for i = 1, 80 do
+      local _ = {}
+      for j = 1, 200 do _[j] = { ("F"):rep(128) } end
+      collectgarbage("step")
+    end
+    for i = 1, 200 do collectgarbage("step") end
+    collectgarbage()
+  end
+  for i = 1, 20 do
+    assert(anchor[i].id == i, "finalizer corrupted anchor["..i.."]")
+  end
+  collectgarbage(oldmode)
+end
+
+do --- major_repeated_transitions
+  -- Stress: force multiple minor→major→gen cycles in succession.
+  local oldmode = collectgarbage("generational", 20, 10)
+  local persistent = { alive = true }
+  for cycle = 1, 8 do
+    for i = 1, 60 do
+      local _ = {}
+      for j = 1, 300 do _[j] = { cycle, j, ("R"):rep(64) } end
+      collectgarbage("step")
+    end
+    for i = 1, 200 do collectgarbage("step") end
+    collectgarbage()
+    assert(persistent.alive, "persistent table lost at cycle "..cycle)
+  end
+  collectgarbage(oldmode)
+end
